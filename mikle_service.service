@@ -1,0 +1,14 @@
+[Unit]
+Description=Telegram Bot
+After=network.target
+
+[Service]
+User=mikle
+Group=mikle
+
+WorkingDirectory=/home/mikle/project/
+Environment="PYTHONPATH=/home/mikle/project/"
+ExecStart=/home/mikle/project/.venv/bin/python /home/mikle/project/main.py
+
+[Install]
+WantedBy=multi-user.target
