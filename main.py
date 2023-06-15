@@ -161,7 +161,7 @@ async def pay(message: types.Message, state: FSMContext):
         await bot.send_message(target_id,
                                f'Ты получил ${sm} от {user_id}({user["name"]})')
     else:
-        if sm > money:
+        if sm > user["money"]:
             await message.answer('Ошибка: Вы хотите перевести больше денег, чем у вас есть.')
         elif sm < 1:
             await message.answer('Ошибка: Вы пытаетесь перевести отрицательное число.')
