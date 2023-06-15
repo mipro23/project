@@ -18,17 +18,23 @@ admins = [1590722856]
 users: dict[int, dict] = defaultdict(dict)
 used_promo_IAMATESTER = []
 used_promo_MATHSISNOTWORKING = []
+used_start = []
+used_promo_GLOBALTEST = []
 
 
 @dp.message_handler(commands=['start'], state='*')
 async def send_welcome(message: types.Message, state: FSMContext):
-    if message.from_user.id in admins:
-        await message.answer("Добро пожаловать, админ!\nДля начала введи свое имя.")
-        await state.set_state('admin_start')
-    else:
-        await message.answer("Добро пожаловать в казино!\nДля начала введи свое имя.")
+    if message.from_user.id not in used_start:
+        if message.from_user.id in admins:
+            await message.answer("Добро пожаловать, админ!\nДля начала введи свое имя.")
+            await state.set_state('admin_start')
+        else:
+            await message.answer("Добро пожаловать в казино!\nДля начала введи свое имя.")
 
-        await state.set_state('start')
+            await state.set_state('start')
+    else:
+        await message.answer('Ты уже зарегистрировался.')
+
 
 
 @dp.message_handler(state='start')
@@ -37,6 +43,7 @@ async def send_welcome2(message: types.Message, state: FSMContext):
     user_id = message.from_id
     users[user_id]['money'] = 50000
     users[user_id]['name'] = name
+    used_start.append(message.from_user.id)
     await message.answer(f'Регистрация успешно пройдена, {name}! Для списка команд напиши /commands.')
     await state.reset_state(with_data=False)
 
@@ -47,6 +54,7 @@ async def send_welcome2(message: types.Message, state: FSMContext):
     user_id = message.from_id
     users[user_id]['money'] = 1000000000000
     users[user_id]['name'] = name
+    used_start.append(message.from_user.id)
     await message.answer(f'Регистрация успешно пройдена, {name}! Для списка команд напиши /commands.')
     await state.set_state('admin')
 
@@ -55,8 +63,8 @@ async def send_welcome2(message: types.Message, state: FSMContext):
 async def commands_a(message: types.Message):
     await message.answer('Список команд для админа:'
                          '\n/write - Оправить сообщение пользователю'
-                         '\n/check - Посмотреть балланс игрока'
                          '\n/online - Посмотреть список игроков'
+                         '\n/take - Отнять деньги у пользователя'
                          )
 
 
@@ -95,17 +103,9 @@ async def write(message: types.Message, state: FSMContext):
     await state.set_state('check')
 
 
-@dp.message_handler(state='check')
-async def write3(message: types.Message, state: FSMContext):
-    b = int(message.text)
-    await message.answer(f'Баланс: {money_list[int(b)]}')
-    await state.set_state('admin')
-
-
 @dp.message_handler(commands=['commands'], state='*')
 async def commands(message: types.Message):
-    await message.answer(
-        'Список команд:\n/play - Поставить на рулетку\n/me - Информация о себе\n/maths - Решить пример и получить деньги\n/channel - Получить ссылку на канал\n/promo - Ввести промокод\n/error - Отправить сообщение в техподдержку\n/pay - Перевод денег другому игроку')
+    await message.answer('Список команд:\n/play - Поставить на рулетку\n/me - Информация о себе\n/maths - Решить пример и получить деньги\n/channel - Получить ссылку на канал\n/promo - Ввести промокод\n/error - Отправить сообщение в техподдержку\n/pay - Перевод денег другому игроку')
 
 
 @dp.message_handler(commands=['me'], state='*')
@@ -126,6 +126,30 @@ async def pay(message: types.Message, state: FSMContext):
     await message.answer('Напиши ник или ID игрока, которому хочешь перевести деньги:')
     await state.set_state('pay')
 
+@dp.message_handler(commands=['take'], state='admin')
+async def pay(message: types.Message, state: FSMContext):
+    await message.answer('Напиши ник или ID игрока, у которого хочешь изнять деньги:')
+    await state.set_state('take')
+
+@dp.message_handler(state='take')
+async def pay2(message: types.Message, state: FSMContext):
+    name = message.text
+    target_id = None
+    if name.isdigit():
+        target_id = int(name)
+    else:
+        for user_id, user in users.items():
+            if user['name'] == name:
+                target_id = user_id
+
+    if target_id:
+        await message.answer('Введи сумму изъятия:')
+        await state.update_data(target_id=target_id)
+        await state.set_state("id_take")
+    else:
+        await message.answer('Такого ника или ID нет.')
+        await state.reset_state(with_data=False)
+
 
 @dp.message_handler(state='pay')
 async def pay2(message: types.Message, state: FSMContext):
@@ -145,6 +169,25 @@ async def pay2(message: types.Message, state: FSMContext):
     else:
         await message.answer('Такого ника или ID нет.')
         await state.reset_state(with_data=False)
+
+@dp.message_handler(state='id_take')
+async def pay(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user_id = message.from_id
+    user = users[user_id]
+    target_id = data["target_id"]
+    sm = float(message.text)
+    if sm > 0 and sm <= user["money"]:
+        users[target_id]["money"] -= sm
+        await message.answer('Деньги отняты успешно!')
+        await bot.send_message(target_id,
+                               f'У тебя забрали ${sm}, и это сделал {user_id}({user["name"]})')
+    else:
+        if sm > user[target_id]["money"]:
+            await message.answer('Ошибка: Вы хотите отнять больше денег, чем у игрока есть.')
+        elif sm < 1:
+            await message.answer('Ошибка: Вы пытаетесь отнять отрицательное число.')
+    await state.reset_state(with_data=False)
 
 
 @dp.message_handler(state='id_pay')
@@ -205,6 +248,13 @@ async def prom(message: types.Message, state: FSMContext):
             used_promo_MATHSISNOTWORKING.append(message.from_user.id)
         else:
             await message.answer('Ты уже вводил этот промокод!')
+    elif promo == 'GLOBALTEST':
+        if message.from_user.id not in used_promo_GLOBALTEST:
+            await message.answer('Промокод введен! Ты получаешь $3000000')
+            user["money"] += 3000000
+            used_promo_GLOBALTEST.append(message.from_user.id)
+        else:
+            await message.answer('Ты уже вводил этот промокод!')
     else:
         await message.answer('Неправильный промокод!')
     await state.reset_state(with_data=False)
@@ -230,7 +280,7 @@ async def play(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state='p2')
 async def play2(message: types.Message, state: FSMContext):
-    user = users[message.from_id]
+    global users
     data = await state.get_data()
     answer = data["answer"]
     cone = message.text
@@ -240,25 +290,25 @@ async def play2(message: types.Message, state: FSMContext):
     if cone.isdigit():
         cone = float(cone)
 
-    if cone <= user["money"]:
+    if cone <= int(users[message.from_id]["money"]):
         if answer == 'красное' and correct in red:
             await message.answer(f'Поздравляю! Выпало {correct} и ты выиграл ${cone}')
-            user["money"] += cone
+            users[message.from_id]["money"] += cone
         elif answer == 'черное' and correct not in red and correct != 0:
             await message.answer(f'Поздравляю! Выпало {correct} и ты выиграл ${cone}')
-            user["money"] += cone
+            users[message.from_id]["money"] += cone
         elif answer == 'большое' and correct > 18:
             await message.answer(f'Поздравляю! Выпало {correct} и ты выиграл ${cone}')
-            user["money"] += cone
-        elif answer == 'большое' and correct < 19 and correct != 0:
+            users[message.from_id]["money"] += cone
+        elif answer == 'маленькое' and correct < 19 and correct != 0:
             await message.answer(f'Поздравляю! Выпало {correct} и ты выиграл ${cone}')
-            user["money"] += cone
+            users[message.from_id]["money"] += cone
         elif answer == correct:
             await message.answer(f'Поздравляю! Выпало {correct} и ты выиграл ${cone * 36}')
-            user["money"] += cone
+            users[message.from_id]["money"] += cone
         else:
             await message.answer(f'К сожалению, выпало {correct} и ты проиграл ${cone}')
-            user["money"] -= cone
+            users[message.from_id]["money"] -= cone
         await state.reset_state(with_data=False)
     else:
         await message.answer('Такого нет, попробуй еще раз')
