@@ -66,7 +66,9 @@ async def commands_a(message: types.Message):
 
 @dp.message_handler(commands=['online'], state='admin')
 async def write(message: types.Message, state: FSMContext):
-    await message.answer(nicknames)
+    for i in range(len(connected_users)):
+        await message.answer(f'Ник игрока: {nicks[i]}   На счету у него ${money_list[connected_users[i]]}\n    Его ID:{connected_users[i]}')
+
 
 @dp.message_handler(commands=['write'], state='admin')
 async def write(message: types.Message, state: FSMContext):
