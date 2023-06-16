@@ -1,10 +1,9 @@
 from collections import defaultdict
 from random import randint
-
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
-
+from time import time
 from my_token import TOKEN
 
 # Initialize bot and dispatcher
@@ -20,6 +19,7 @@ used_promo_IAMATESTER = []
 used_promo_MATHSISNOTWORKING = []
 used_start = []
 used_promo_GLOBALTEST = []
+daily_counter = ''
 
 
 @dp.message_handler(commands=['start'], state='*')
@@ -105,7 +105,7 @@ async def write(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=['commands'], state='*')
 async def commands(message: types.Message):
-    await message.answer('Список команд:\n/play - Поставить на рулетку\n/me - Информация о себе\n/maths - Решить пример и получить деньги\n/channel - Получить ссылку на канал\n/promo - Ввести промокод\n/error - Отправить сообщение в техподдержку\n/pay - Перевод денег другому игроку')
+    await message.answer('Список команд:\n/play - Поставить на рулетку\n/me - Информация о себе\n/maths - Решить пример и получить деньги\n/channel - Получить ссылку на канал\n/promo - Ввести промокод\n/error - Отправить сообщение в техподдержку\n/pay - Перевод денег другому игроку\n/daily - Получить ежедневную награду')
 
 
 @dp.message_handler(commands=['me'], state='*')
@@ -113,6 +113,20 @@ async def me(message: types.Message, state: FSMContext):
     user = users[message.from_id]
     await message.answer(
         f'Твой ник: {user["name"]}\nНа счету у тебя ${user["money"]}\nТвой ID:{message.from_user.id}')
+
+@dp.message_handler(commands=['daily'], state='*')
+async def daily(message: types.Message, state: FSMContext):
+    global daily_counter, users
+    if daily_counter == '' or time()-daily_counter > 24*60*60:
+        users[message.from_user.id]["money"] += 500000
+        daily_counter = time()
+        await message.answer("Ты получаешь $500000!")
+    else:
+        delta_time = 24*60*60 - (time() - daily_counter)
+        hour = delta_time // 3600
+        minute = (delta_time % 3600) // 60
+        second = delta_time % 60
+        await message.answer(f'До получения осталось {int(hour)} часов {int(minute)} минут {int(second)} секунд.')
 
 
 @dp.message_handler(commands=['error'], state='*')
